@@ -921,7 +921,8 @@ impl ProveOnce {
             )
             .map_err(|e| WalletError::MigrationBuild(format!("{e}")))?;
 
-        let (sapling_output, sapling_spend) = crate::wallet::utils::read_sapling_params();
+        let (sapling_output, sapling_spend) = crate::wallet::utils::read_sapling_params()
+            .map_err(WalletError::MigrationBuild)?;
         let sapling_prover =
             zcash_proofs::prover::LocalTxProver::from_bytes(&sapling_spend, &sapling_output);
         let build_result = builder

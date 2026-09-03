@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
-//! Build-time inputs: the Sapling proving parameters (fetched once,
-//! copied beside the crate for mobile packaging) and the `git describe`
-//! string compiled into [`zingolib::git_description`].
+//! Build-time input: the `git describe` string compiled into
+//! [`zingolib::git_description`].
 //!
 //! The script registers its watch set explicitly. Without any
 //! `cargo:rerun-if-changed` directive cargo falls back to watching the
@@ -19,10 +18,6 @@ use std::{env, fs::File, process::Command};
 /// point: the package tree contains this script's own outputs.
 fn register_rerun_watches() {
     println!("cargo:rerun-if-changed=build.rs");
-    // The params copies: deleting either one triggers a rerun, which
-    // restores it. While both exist the fetch is skipped entirely.
-    println!("cargo:rerun-if-changed=zcash-params/sapling-spend.params");
-    println!("cargo:rerun-if-changed=zcash-params/sapling-output.params");
     // The git state behind `git describe`: HEAD moves live in the
     // worktree's own git dir; tags and packed refs live in the common
     // dir (they differ in linked worktrees). The `--dirty` suffix is
@@ -135,42 +130,8 @@ fn git_description() {
     .unwrap();
 }
 
-/// Checks if zcash params are available and downloads them if not.
-/// Also copies them to an internal location for use by mobile platforms.
-/// Skipped entirely while both copies exist: rewriting them
-/// unconditionally is what used to dirty the package on every build.
-fn get_zcash_params() {
-    let internal_params_path = Path::new("zcash-params");
-    let spend_dest = internal_params_path.join("sapling-spend.params");
-    let output_dest = internal_params_path.join("sapling-output.params");
-    if spend_dest.exists() && output_dest.exists() {
-        return;
-    }
-
-    println!("Checking if params are available...");
-
-    let params_path = match zcash_proofs::download_sapling_parameters(Some(400)) {
-        Ok(p) => {
-            println!("Params downloaded!");
-            println!("Spend path: {}", p.spend.to_str().unwrap());
-            println!("Output path: {}", p.output.to_str().unwrap());
-            p
-        }
-        Err(e) => {
-            println!("Error downloading params: {e}");
-            panic!();
-        }
-    };
-
-    // Copy the params to the internal location.
-    std::fs::create_dir_all(internal_params_path).unwrap();
-    std::fs::copy(params_path.spend, spend_dest).unwrap();
-    std::fs::copy(params_path.output, output_dest).unwrap();
-}
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     register_rerun_watches();
-    get_zcash_params();
     git_description();
     Ok(())
 }
